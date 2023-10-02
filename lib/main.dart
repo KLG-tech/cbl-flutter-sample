@@ -83,7 +83,7 @@ class _LogMessagesPageState extends State<LogMessagesPage> {
                   // ordering.
                   final logMessage =
                       _logMessages[_logMessages.length - 1 - index];
-
+                  print('================> ${logMessage.id}');
                   return LogMessageTile(logMessage: logMessage);
                 },
               ),
@@ -222,7 +222,7 @@ class CblLogMessage extends LogMessage {
   DateTime get createdAt => dict.value('createdAt')!;
 
   @override
-  String get message => dict.value('content')!;
+  String get message => dict.value('message')!;
 }
 
 extension DictionaryDocumentIdExt on DictionaryInterface {
@@ -245,10 +245,10 @@ class LogMessageRepository {
     final doc = MutableDocument({
       'type': 'logMessage',
       'createdAt': DateTime.now(),
-      'content': message,
+      'message': message,
+      'additional': 'additional',
     });
     await collection.saveDocument(doc);
-    print("++++++++++++ THIS IS A CREATED DOC" + doc.value('content')!);
     return CblLogMessage(doc);
   }
 
@@ -257,7 +257,7 @@ class LogMessageRepository {
         .select(
           SelectResult.expression(Meta.id),
           SelectResult.property('createdAt'),
-          SelectResult.property('content'),
+          SelectResult.property('message'),
         )
         .from(DataSource.collection(collection))
         .where(
@@ -292,10 +292,10 @@ Future<void> initApp() async {
   await CouchbaseLiteFlutter.init();
 
   // Uncomment the line below to reset the database each time the app starts.
-  // await Database.remove('example');
+  await Database.remove('log');
 
   database = await Database.openAsync('log');
-  logMessages = await database.createCollection('message', 'chatime');
+  logMessages = await database.createCollection('pesan', 'chatime');
   // logMessages = await database.createCollection('message');
 
   // This index speeds up queries, among others, that filter documents by an
@@ -312,17 +312,15 @@ Future<void> initApp() async {
 
 // Couchbase
   final config = ReplicatorConfiguration(
-      authenticator:
-          BasicAuthenticator(password: 'password', username: 'daniel'),
-      target: UrlEndpoint(Uri.parse('ws://localhost:4984/log')),
-      headers: {'Client': 'test'},
-      continuous: true,
-      replicatorType: ReplicatorType.pushAndPull)
-    ..addCollection(
+    authenticator: BasicAuthenticator(password: 'password', username: 'daniel'),
+    target: UrlEndpoint(Uri.parse('ws://localhost:4984/log')),
+    continuous: true,
+  )..addCollection(
       logMessages,
       CollectionConfiguration(
-        conflictResolver:
-            ConflictResolver.from((conflict) => conflict.remoteDocument),
+        channels: ['*', '!'],
+        pullFilter: (Document document, flags) => true,
+        pushFilter: (Document document, flags) => true,
       ),
     );
 
